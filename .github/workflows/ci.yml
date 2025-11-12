@@ -35,7 +35,7 @@ jobs:
         run: npm run build
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-dist
           path: web/frontend/dist/
@@ -195,7 +195,7 @@ jobs:
           fi
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report
@@ -242,7 +242,7 @@ jobs:
           echo "Built: ${OUTPUT_NAME}"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cortex-${{ matrix.goos }}-${{ matrix.goarch }}
           path: cortex-*
