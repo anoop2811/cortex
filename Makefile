@@ -23,14 +23,19 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build-frontend: ## Build frontend and copy to server
-	@echo "Building frontend..."
+	@echo "$(GREEN)Building frontend...$(NC)"
 	@if [ -d "web/frontend" ]; then \
+		if [ ! -d "web/frontend/node_modules" ]; then \
+			echo "$(YELLOW)Installing frontend dependencies...$(NC)"; \
+			cd web/frontend && npm install; \
+		fi; \
 		cd web/frontend && npm run build && \
-		rm -rf ../server/frontend/dist && \
-		cp -r dist ../server/frontend/ && \
-		echo "✓ Frontend built and copied to server"; \
+		rm -rf ../server/frontend && \
+		mkdir -p ../server/frontend && \
+		cp -r dist/* ../server/frontend/ && \
+		echo "$(GREEN)✓ Frontend built and copied to server$(NC)"; \
 	else \
-		echo "⚠️  Frontend directory not found, skipping frontend build"; \
+		echo "$(YELLOW)⚠️  Frontend directory not found, skipping frontend build$(NC)"; \
 	fi
 
 build-local: build-frontend ## Build cortex binary locally with frontend
@@ -39,9 +44,18 @@ build-local: build-frontend ## Build cortex binary locally with frontend
 
 build: build-local ## Alias for build-local
 
-docker-build: ## Build Docker image
+docker-build: ## Build Docker image (CLI only, no UI)
 	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 	@echo "✓ Built Docker image: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+
+docker-build-ui: ## Build Docker image with Web UI (recommended)
+	@echo "$(GREEN)Building Cortex with Web UI in Docker...$(NC)"
+	docker build -f Dockerfile.ui -t $(DOCKER_IMAGE)-ui:$(DOCKER_TAG) .
+	@echo "$(GREEN)✓ Built Docker image with UI: $(DOCKER_IMAGE)-ui:$(DOCKER_TAG)$(NC)"
+
+docker-run-ui: ## Run Cortex UI in Docker
+	@echo "$(GREEN)Starting Cortex UI in Docker...$(NC)"
+	docker run --rm -it -p 9090:8080 $(DOCKER_IMAGE)-ui:$(DOCKER_TAG) cortex ui --host 0.0.0.0 --port 8080
 
 docker-run: ## Run cortex in Docker (pass ARGS="your-command")
 	docker run --rm -it \
@@ -182,3 +196,51 @@ example-system: build-local ## Run system health check example
 
 example-k8s: build-local ## Run K8s health check example
 	cd example/k8s/k8s_cluster_health && ../../../$(BINARY_NAME) exec -p .
+
+## Web UI targets
+
+ui-dev: ## Start frontend dev server with hot reload (requires backend running)
+	@echo "$(GREEN)Starting Vite dev server...$(NC)"
+	@echo "$(YELLOW)Make sure backend is running: make ui-backend$(NC)"
+	cd web/frontend && npm run dev
+
+ui-backend: ## Start backend server for UI development
+	@echo "$(GREEN)Starting backend server...$(NC)"
+	$(GO) build -o $(BINARY_NAME) .
+	./$(BINARY_NAME) ui --port 9090 --verbose 3
+
+ui-build: build-frontend ## Build frontend only (alias for build-frontend)
+	@echo "$(GREEN)✓ Frontend built$(NC)"
+
+ui-install: ## Install frontend dependencies
+	@echo "$(GREEN)Installing frontend dependencies...$(NC)"
+	cd web/frontend && npm install
+	@echo "$(GREEN)✓ Frontend dependencies installed$(NC)"
+
+ui-clean-install: ## Clean install frontend dependencies (fixes ARM64 Mac issues)
+	@echo "$(YELLOW)Cleaning frontend dependencies...$(NC)"
+	cd web/frontend && rm -rf node_modules package-lock.json
+	@echo "$(GREEN)Installing fresh dependencies...$(NC)"
+	cd web/frontend && npm install
+	@echo "$(GREEN)✓ Frontend dependencies cleanly installed$(NC)"
+
+ui-fix-arm64: ## Fix Rollup ARM64 issue on Apple Silicon Macs
+	@echo "$(YELLOW)Fixing ARM64 dependency issue...$(NC)"
+	cd web/frontend && rm -rf node_modules package-lock.json && npm cache clean --force
+	@echo "$(GREEN)Reinstalling with force flag...$(NC)"
+	cd web/frontend && npm install --force
+	@echo "$(GREEN)✓ ARM64 dependencies fixed$(NC)"
+
+ui-lint: ## Lint frontend code
+	@echo "$(GREEN)Linting frontend...$(NC)"
+	cd web/frontend && npm run lint
+
+ui-typecheck: ## Type check frontend code
+	@echo "$(GREEN)Type checking frontend...$(NC)"
+	cd web/frontend && npm run typecheck
+
+ui: build ## Build everything and start UI server
+	@echo "$(GREEN)Starting Cortex UI...$(NC)"
+	./$(BINARY_NAME) ui --port 9090
+
+ui-full: ui-install build ui ## Full build and start UI (install deps, build, start)

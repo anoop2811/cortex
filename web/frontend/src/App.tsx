@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, Network, Settings as SettingsIcon } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Network, Settings as SettingsIcon, Layers } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { SynapseBuilder } from './components/SynapseBuilder';
+import { SynapseList } from './components/SynapseList';
+import { NeuronCreator } from './components/NeuronCreator';
+import { Settings } from './components/Settings';
 import { apiClient } from './api/client';
 import { Neuron } from './types';
 
@@ -12,6 +15,7 @@ const Navigation: React.FC<{ isMobileMenuOpen: boolean; onToggleMobileMenu: () =
 }) => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/synapses', label: 'Synapses', icon: Layers },
     { path: '/synapse-builder', label: 'Synapse Builder', icon: Network },
     { path: '/settings', label: 'Settings', icon: SettingsIcon },
   ];
@@ -67,18 +71,6 @@ const Navigation: React.FC<{ isMobileMenuOpen: boolean; onToggleMobileMenu: () =
   );
 };
 
-const Settings: React.FC = () => {
-  return (
-    <div className="min-h-screen bg-background-navy">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-heading font-bold text-text-primary mb-8 gradient-text">Settings</h1>
-        <div className="glass rounded-xl shadow-card p-8">
-          <p className="text-text-secondary text-lg">Settings page coming soon...</p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const SynapseBuilderPage: React.FC = () => {
   const [neurons, setNeurons] = useState<Neuron[]>([]);
@@ -166,6 +158,8 @@ const App: React.FC = () => {
         {/* Routes */}
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/neurons/new" element={<NeuronCreator />} />
+          <Route path="/synapses" element={<SynapseList />} />
           <Route path="/synapse-builder" element={<SynapseBuilderPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -101,3 +101,9 @@ acceptance/web-ui/.cache/
 
 # Test log files
 *.log
+
+# Frontend build artifacts
+web/frontend/node_modules/
+web/frontend/dist/
+web/server/frontend/
+*.tsbuildinfo

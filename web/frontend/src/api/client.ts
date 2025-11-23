@@ -51,6 +51,27 @@ class ApiClient {
     return response.data;
   }
 
+  async getNeuronScript(id: string): Promise<string> {
+    const response = await this.client.get<{ script: string }>(`/neurons/${id}/script`);
+    return response.data.script;
+  }
+
+  async createNeuron(neuron: { name: string; type: string; description: string; script?: string }): Promise<Neuron> {
+    const response = await this.client.post<Neuron>('/neurons', neuron);
+    return response.data;
+  }
+
+  async generateNeuron(request: {
+    prompt: string;
+    type: string;
+    provider: string;
+    apiKey?: string;
+    ollamaUrl?: string;
+  }): Promise<Neuron> {
+    const response = await this.client.post<Neuron>('/neurons/generate', request);
+    return response.data;
+  }
+
   async executeNeuron(id: string, params?: Record<string, any>): Promise<ExecutionStatus> {
     const response = await this.client.post<ExecutionStatus>(`/neurons/${id}/execute`, params);
     return response.data;
@@ -90,6 +111,11 @@ class ApiClient {
 
   async deleteSynapse(id: string): Promise<void> {
     await this.client.delete(`/synapses/${id}`);
+  }
+
+  async executeSynapse(id: string): Promise<{ id: string; status: string; message: string }> {
+    const response = await this.client.post(`/synapses/${id}/execute`);
+    return response.data;
   }
 
   // System API

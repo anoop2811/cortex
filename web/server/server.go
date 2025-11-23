@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//go:embed all:frontend/dist
+//go:embed frontend
 var frontendFiles embed.FS
 
 // Server represents the web server
@@ -63,9 +63,14 @@ func (s *Server) setupRoutes() {
 
 	// API routes
 	s.router.HandleFunc("/api/neurons", h.ListNeurons).Methods("GET")
+	s.router.HandleFunc("/api/neurons", h.CreateNeuron).Methods("POST")
+	s.router.HandleFunc("/api/neurons/generate", h.GenerateNeuron).Methods("POST")
+	s.router.HandleFunc("/api/neurons/{id}/script", h.GetNeuronScript).Methods("GET")
+	s.router.HandleFunc("/api/neurons/{id}/execute", h.ExecuteNeuron).Methods("POST")
 	s.router.HandleFunc("/api/synapses", h.ListSynapses).Methods("GET")
 	s.router.HandleFunc("/api/synapses", h.CreateSynapse).Methods("POST")
 	s.router.HandleFunc("/api/synapses/{id}", h.GetSynapse).Methods("GET")
+	s.router.HandleFunc("/api/synapses/{id}/execute", h.ExecuteSynapse).Methods("POST")
 	s.router.HandleFunc("/api/synapses/{id}", h.UpdateSynapse).Methods("PUT")
 	s.router.HandleFunc("/api/synapses/{id}", h.DeleteSynapse).Methods("DELETE")
 	s.router.HandleFunc("/api/execute", h.Execute).Methods("POST")

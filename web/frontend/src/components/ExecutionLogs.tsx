@@ -35,13 +35,22 @@ const LogEntry: React.FC<{ log: ExecutionLog }> = ({ log }) => {
     }
   };
 
+  // Check if message contains newlines for multi-line output
+  const isMultiLine = log.message.includes('\n');
+
   return (
     <div className={`flex gap-3 p-3 border-l-4 rounded-r-lg ${getLevelClass()} font-mono text-sm transition-all duration-200 hover:bg-opacity-20`}>
       <LogLevelIcon level={log.level} />
-      <span className="text-text-muted min-w-[80px] font-medium">
+      <span className="text-text-muted min-w-[80px] font-medium self-start">
         {new Date(log.timestamp).toLocaleTimeString()}
       </span>
-      <span className="flex-1 text-text-primary break-all">{log.message}</span>
+      <div className="flex-1 text-text-primary">
+        {isMultiLine ? (
+          <pre className="whitespace-pre-wrap break-words font-mono text-sm m-0">{log.message}</pre>
+        ) : (
+          <span className="break-all">{log.message}</span>
+        )}
+      </div>
     </div>
   );
 };
@@ -89,11 +98,18 @@ export const ExecutionLogs: React.FC<ExecutionLogsProps> = ({
           <div className="flex items-center gap-3">
             <Terminal className="w-6 h-6 text-accent-cyan" />
             <h3 className="font-heading font-bold text-text-primary text-lg">Execution Logs</h3>
-            {!isConnected && (
+            {isConnected ? (
+              <span className="text-xs bg-green-500/20 border border-green-500/30 text-green-400 px-3 py-1 rounded-full">
+                ● Connected
+              </span>
+            ) : (
               <span className="text-xs bg-red-500/20 border border-red-500/30 text-red-400 px-3 py-1 rounded-full animate-pulse">
-                Disconnected
+                ● Disconnected
               </span>
             )}
+            <span className="text-xs text-text-muted">
+              ({logs.length} logs)
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {getStatusBadge()}

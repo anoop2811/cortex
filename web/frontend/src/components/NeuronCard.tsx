@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Square, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Play, Square, Clock, CheckCircle, XCircle, Loader, Code, X } from 'lucide-react';
 import { Neuron, ExecutionStatus } from '../types';
 import { apiClient } from '../api/client';
 
@@ -12,6 +12,9 @@ interface NeuronCardProps {
 export const NeuronCard: React.FC<NeuronCardProps> = ({ neuron, onExecute, onStatusChange }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const [showScript, setShowScript] = useState(false);
+  const [script, setScript] = useState<string>('');
+  const [loadingScript, setLoadingScript] = useState(false);
 
   const getStatusIcon = () => {
     switch (neuron.status) {
@@ -42,14 +45,35 @@ export const NeuronCard: React.FC<NeuronCardProps> = ({ neuron, onExecute, onSta
   const handleExecute = async () => {
     try {
       setIsExecuting(true);
+      console.log('Executing neuron:', neuron.id);
       const status = await apiClient.executeNeuron(neuron.id);
+      console.log('Execute response:', status);
       setExecutionId(status.id);
       onExecute?.(neuron);
+      console.log('Calling onStatusChange with:', status);
       onStatusChange?.(status);
     } catch (error) {
       console.error('Failed to execute neuron:', error);
     } finally {
       setIsExecuting(false);
+    }
+  };
+
+  const handleViewScript = async () => {
+    if (showScript) {
+      setShowScript(false);
+      return;
+    }
+
+    try {
+      setLoadingScript(true);
+      const scriptContent = await apiClient.getNeuronScript(neuron.id);
+      setScript(scriptContent);
+      setShowScript(true);
+    } catch (error) {
+      console.error('Failed to load script:', error);
+    } finally {
+      setLoadingScript(false);
     }
   };
 
@@ -92,40 +116,72 @@ export const NeuronCard: React.FC<NeuronCardProps> = ({ neuron, onExecute, onSta
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-primary-500/10">
+        <div className="flex flex-col gap-4 mt-6 pt-4 border-t border-primary-500/10">
           <div className="flex flex-col gap-2">
-            <span className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-medium border ${getStatusColor()}`}>
+            <span className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-medium border w-fit ${getStatusColor()}`}>
               {neuron.status}
             </span>
-            <div className="flex items-center gap-2 text-xs text-text-muted">
+            <div className="flex items-center gap-2 text-xs text-text-muted flex-wrap">
               <span className="px-2 py-1 bg-background-slate/50 rounded-md">{neuron.type}</span>
-              <span>Updated: {new Date(neuron.updatedAt).toLocaleDateString()}</span>
+              <span className="px-2 py-1 bg-background-slate/50 rounded-md truncate max-w-[200px]" title={neuron.path}>
+                {neuron.path}
+              </span>
             </div>
           </div>
 
-          <button
-            onClick={isRunning ? handleStop : handleExecute}
-            disabled={isExecuting}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-pill font-medium transition-all duration-300 ${
-              isRunning
-                ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white hover:shadow-glow-purple hover:scale-105'
-                : 'bg-gradient-purple hover:shadow-glow-purple text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105'
-            }`}
-            aria-label={isRunning ? 'Stop execution' : 'Execute neuron'}
-          >
-            {isRunning ? (
-              <>
-                <Square className="w-4 h-4" />
-                <span>Stop</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleViewScript}
+              disabled={loadingScript}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-pill font-medium transition-all duration-300 bg-background-card hover:bg-background-card/80 text-text-secondary hover:text-text-primary border border-primary-500/20 hover:border-primary-500/40 hover:scale-105"
+              aria-label="View script"
+            >
+              {loadingScript ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : showScript ? (
+                <X className="w-4 h-4" />
+              ) : (
+                <Code className="w-4 h-4" />
+              )}
+              <span>{showScript ? 'Hide' : 'View'}</span>
+            </button>
+            <button
+              onClick={isRunning ? handleStop : handleExecute}
+              disabled={isExecuting}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-pill font-medium transition-all duration-300 ${
+                isRunning
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white hover:shadow-glow-purple hover:scale-105'
+                  : 'bg-gradient-purple hover:shadow-glow-purple text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105'
+              }`}
+              aria-label={isRunning ? 'Stop execution' : 'Execute neuron'}
+            >
+              {isRunning ? (
+                <>
+                  <Square className="w-4 h-4" />
+                  <span>Stop</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
                 <span>Execute</span>
               </>
             )}
           </button>
+          </div>
         </div>
+
+        {/* Script Viewer */}
+        {showScript && (
+          <div className="mt-6 pt-6 border-t border-primary-500/10 animate-fade-in">
+            <div className="flex items-center gap-2 mb-3">
+              <Code className="w-4 h-4 text-accent-cyan" />
+              <h4 className="text-sm font-semibold text-text-primary">Script Content (run.sh)</h4>
+            </div>
+            <pre className="bg-background-card border border-primary-500/20 rounded-lg p-4 text-xs text-text-secondary font-mono overflow-x-auto max-h-96 overflow-y-auto">
+              {script}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

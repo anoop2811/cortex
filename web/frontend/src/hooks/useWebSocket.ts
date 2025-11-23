@@ -53,11 +53,19 @@ export const useWebSocket = (options: UseWebSocketOptions) => {
 
       ws.onmessage = (event) => {
         try {
+          console.log('Raw WebSocket message:', event.data);
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('Parsed WebSocket message:', message);
           setLastMessage(message);
-          onMessage?.(message);
+
+          // Wrap onMessage in try-catch to prevent errors from closing connection
+          try {
+            onMessage?.(message);
+          } catch (error) {
+            console.error('Error handling WebSocket message:', error);
+          }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('Failed to parse WebSocket message:', error, 'Raw data:', event.data);
         }
       };
 
@@ -129,23 +137,59 @@ export const useExecutionLogs = (executionId?: string) => {
 
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
-      if (message.type === 'log') {
-        const log = message.payload as ExecutionLog;
-        if (!executionId || log.neuronId === executionId) {
-          setLogs((prev) => [...prev, log]);
+      try {
+        console.log('ExecutionLogs handling message:', message);
+
+        // Backend uses 'data' field, not 'payload'
+        const messageData = message.data || message.payload;
+
+        if (!messageData) {
+          console.warn('No data in message:', message);
+          return;
         }
-      } else if (message.type === 'status') {
-        const newStatus = message.payload as ExecutionStatus;
-        if (!executionId || newStatus.neuronId === executionId) {
-          setStatus(newStatus);
+
+        if (message.type === 'log') {
+          const logData = messageData as any;
+          const log: ExecutionLog = {
+            id: `${Date.now()}-${Math.random()}`,
+            neuronId: logData.executionId || logData.ExecutionID || '',
+            timestamp: message.timestamp || new Date().toISOString(),
+            level: (logData.level || logData.Level || 'info') as 'info' | 'warn' | 'error' | 'debug',
+            message: logData.message || logData.Message || JSON.stringify(logData),
+          };
+
+          console.log('Processing log:', log, 'executionId filter:', executionId);
+
+          // Show all logs if no executionId filter, or match executionId
+          if (!executionId || log.neuronId === executionId || !log.neuronId) {
+            console.log('Adding log to display');
+            setLogs((prev) => [...prev, log]);
+          } else {
+            console.log('Skipping log - executionId mismatch');
+          }
+        } else if (message.type === 'status') {
+          const statusData = messageData as any;
+          console.log('Processing status:', statusData);
+          const newStatus: ExecutionStatus = {
+            id: statusData.executionId || statusData.ExecutionID || '',
+            neuronId: statusData.executionId || statusData.ExecutionID || '',
+            status: (statusData.status || statusData.Status || 'running') as 'running' | 'completed' | 'failed',
+            startTime: new Date().toISOString(),
+          };
+
+          if (!executionId || newStatus.neuronId === executionId || !newStatus.neuronId) {
+            setStatus(newStatus);
+          }
         }
+      } catch (error) {
+        console.error('Error in handleMessage:', error, 'Message:', message);
       }
     },
     [executionId]
   );
 
   const { isConnected, sendMessage } = useWebSocket({
-    url: '/ws/executions',
+    url: '/ws',
     onMessage: handleMessage,
   });
 

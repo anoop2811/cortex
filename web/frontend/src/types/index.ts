@@ -3,9 +3,10 @@ export interface Neuron {
   name: string;
   description: string;
   type: string;
+  path: string;
   status: 'idle' | 'running' | 'completed' | 'failed';
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   metadata?: Record<string, any>;
 }
 
@@ -49,6 +50,7 @@ export interface SystemMetrics {
 export interface SynapseNode {
   id: string;
   type: 'neuron' | 'input' | 'output';
+  neuronId: string;
   position: {
     x: number;
     y: number;
@@ -82,5 +84,7 @@ export interface Synapse {
 
 export interface WebSocketMessage {
   type: 'log' | 'status' | 'metrics';
-  payload: ExecutionLog | ExecutionStatus | SystemMetrics;
+  timestamp: string;
+  data: any;
+  payload?: any; // For backwards compatibility
 }
