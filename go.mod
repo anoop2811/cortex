@@ -3,7 +3,7 @@ module github.com/anoop2811/cortex
 go 1.25
 
 require (
-	github.com/fatih/color v1.10.0
+	github.com/fatih/color v1.18.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
