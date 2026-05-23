@@ -4,10 +4,29 @@ import "time"
 
 // Neuron represents a neuron definition
 type Neuron struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Type        string `json:"type"`        // "check" or "mutate"
 	Description string `json:"description"`
 	Path        string `json:"path"`
+	Status      string `json:"status,omitempty"` // "idle", "running", "completed", "failed"
+}
+
+// CreateNeuronRequest represents a request to create a new neuron
+type CreateNeuronRequest struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`        // "check" or "mutate"
+	Description string `json:"description"`
+	Script      string `json:"script,omitempty"` // Optional shell script content
+}
+
+// GenerateNeuronRequest represents a request to generate a neuron using AI
+type GenerateNeuronRequest struct {
+	Prompt    string `json:"prompt"`              // Natural language description
+	Type      string `json:"type"`                // "check" or "mutate"
+	Provider  string `json:"provider"`            // "openai", "anthropic", or "ollama"
+	APIKey    string `json:"apiKey,omitempty"`    // API key for OpenAI/Anthropic
+	OllamaURL string `json:"ollamaUrl,omitempty"` // Ollama base URL (optional)
 }
 
 // SynapseNode represents a node in the visual synapse builder

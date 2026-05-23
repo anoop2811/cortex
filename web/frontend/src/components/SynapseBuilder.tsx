@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ReactFlow,
   Node,
@@ -91,11 +92,65 @@ interface SynapseBuilderProps {
 }
 
 export const SynapseBuilder: React.FC<SynapseBuilderProps> = ({ neurons, onSave }) => {
+  const location = useLocation();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [synapseName, setSynapseName] = useState('');
   const [synapseDescription, setSynapseDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Load synapse if passed via navigation state
+  useEffect(() => {
+    const synapse = (location.state as any)?.synapse as Synapse | undefined;
+
+    if (synapse) {
+      console.log('Loading synapse:', synapse);
+      console.log('Synapse nodes:', synapse.nodes);
+      console.log('Synapse connections:', synapse.connections);
+
+      try {
+        // Convert synapse nodes to ReactFlow nodes
+        const reactFlowNodes: Node[] = synapse.nodes.map((node) => {
+          console.log('Converting node:', node);
+          return {
+            id: node.id,
+            type: 'neuron',
+            position: {
+              x: typeof node.position === 'object' ? (node.position as any).x : 0,
+              y: typeof node.position === 'object' ? (node.position as any).y : 0,
+            },
+            data: {
+              label: (node.data as any)?.label || 'Unknown',
+              description: (node.data as any)?.description || '',
+              neuronId: (node.data as any)?.neuronId || node.neuronId || '',
+            },
+          };
+        });
+
+        // Convert synapse connections to ReactFlow edges
+        const reactFlowEdges: Edge[] = synapse.connections.map((conn) => ({
+          id: conn.id,
+          source: conn.source,
+          target: conn.target,
+          sourceHandle: conn.sourceHandle || 'output-1',
+          targetHandle: conn.targetHandle || 'input-1',
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#41E9E0', strokeWidth: 2 },
+        }));
+
+        console.log('Converted to ReactFlow nodes:', reactFlowNodes);
+        console.log('Converted to ReactFlow edges:', reactFlowEdges);
+
+        setNodes(reactFlowNodes);
+        setEdges(reactFlowEdges);
+        setSynapseName(synapse.name);
+        setSynapseDescription(synapse.description);
+      } catch (error) {
+        console.error('Error loading synapse:', error);
+      }
+    }
+  }, [location.state, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -189,11 +244,14 @@ export const SynapseBuilder: React.FC<SynapseBuilderProps> = ({ neurons, onSave 
     const synapseNodes = nodes.map((node) => ({
       id: node.id,
       type: (node.type || 'neuron') as 'neuron' | 'input' | 'output',
-      neuronId: node.data.neuronId as string | undefined,
-      position: node.position,
+      neuronId: node.data.neuronId as string || '',
+      position: {
+        x: Math.round(node.position.x),
+        y: Math.round(node.position.y),
+      },
       data: {
-        label: node.data.label as string,
-        description: node.data.description as string | undefined,
+        label: node.data.label as string || '',
+        description: (node.data.description as string) || '',
       },
     }));
 

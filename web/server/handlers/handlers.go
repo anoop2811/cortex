@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime"
 
@@ -54,6 +55,91 @@ func (h *Handlers) ListNeurons(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, neurons)
+}
+
+// GetNeuronScript handles GET /api/neurons/{id}/script
+func (h *Handlers) GetNeuronScript(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Neuron ID is required"})
+		return
+	}
+
+	script, err := h.neuronService.GetNeuronScript(id)
+	if err != nil {
+		h.logger.Error(err, fmt.Sprintf("Failed to get script for neuron: %s", id))
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"script": script})
+}
+
+// CreateNeuron handles POST /api/neurons
+func (h *Handlers) CreateNeuron(w http.ResponseWriter, r *http.Request) {
+	var req models.CreateNeuronRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Neuron name is required"})
+		return
+	}
+	if req.Type != "check" && req.Type != "mutate" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Neuron type must be 'check' or 'mutate'"})
+		return
+	}
+
+	neuron, err := h.neuronService.CreateNeuron(&req)
+	if err != nil {
+		h.logger.Error(err, "Failed to create neuron")
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, neuron)
+}
+
+// GenerateNeuron handles POST /api/neurons/generate
+func (h *Handlers) GenerateNeuron(w http.ResponseWriter, r *http.Request) {
+	var req models.GenerateNeuronRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate required fields
+	if req.Prompt == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prompt is required"})
+		return
+	}
+	if req.Type != "check" && req.Type != "mutate" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Neuron type must be 'check' or 'mutate'"})
+		return
+	}
+	if req.Provider != "openai" && req.Provider != "anthropic" && req.Provider != "ollama" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Provider must be 'openai', 'anthropic', or 'ollama'"})
+		return
+	}
+
+	// Validate API key for OpenAI/Anthropic
+	if (req.Provider == "openai" || req.Provider == "anthropic") && req.APIKey == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("%s API key is required", req.Provider)})
+		return
+	}
+
+	neuron, err := h.neuronService.GenerateNeuronWithAI(&req)
+	if err != nil {
+		h.logger.Error(err, "Failed to generate neuron with AI")
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, neuron)
 }
 
 // ListSynapses handles GET /api/synapses
@@ -146,6 +232,123 @@ func (h *Handlers) DeleteSynapse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ExecuteNeuron handles POST /api/neurons/{id}/execute
+func (h *Handlers) ExecuteNeuron(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Neuron ID is required"})
+		return
+	}
+
+	// Get neuron details
+	neurons, err := h.neuronService.ListNeurons()
+	if err != nil {
+		h.logger.Error(err, "Failed to list neurons")
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to get neuron"})
+		return
+	}
+
+	// Find the neuron by ID
+	var neuron *models.Neuron
+	for _, n := range neurons {
+		if n.ID == id || n.Name == id {
+			neuron = &n
+			break
+		}
+	}
+
+	if neuron == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Neuron not found"})
+		return
+	}
+
+	// Execute the neuron
+	req := models.ExecuteRequest{
+		Type: "neuron",
+		Name: neuron.Name,
+		Path: neuron.Path,
+	}
+
+	execution, err := h.executionService.Execute(req)
+	if err != nil {
+		h.logger.Error(err, "Execution failed")
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, execution)
+}
+
+// ExecuteSynapse handles POST /api/synapses/{id}/execute
+func (h *Handlers) ExecuteSynapse(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Synapse ID is required"})
+		return
+	}
+
+	// Get synapse details
+	synapse, err := h.synapseService.GetSynapse(id)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Get all neurons to map neuronId to path
+	neurons, err := h.neuronService.ListNeurons()
+	if err != nil {
+		h.logger.Error(err, "Failed to list neurons")
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to get neurons"})
+		return
+	}
+
+	neuronMap := make(map[string]*models.Neuron)
+	for i := range neurons {
+		neuronMap[neurons[i].ID] = &neurons[i]
+		neuronMap[neurons[i].Name] = &neurons[i]
+	}
+
+	executionID := uuid.New().String()
+
+	// Execute neurons in the synapse sequentially
+	go func() {
+		h.logger.Infof("Starting synapse execution: %s", synapse.Name)
+
+		for _, node := range synapse.Nodes {
+			neuron, exists := neuronMap[node.NeuronID]
+			if !exists {
+				h.logger.Infof("Neuron not found: %s", node.NeuronID)
+				continue
+			}
+
+			h.logger.Infof("Executing neuron in synapse: %s", neuron.Name)
+
+			// Execute each neuron
+			req := models.ExecuteRequest{
+				Type: "neuron",
+				Name: neuron.Name,
+				Path: neuron.Path,
+			}
+
+			_, err := h.executionService.Execute(req)
+			if err != nil {
+				h.logger.Error(err, fmt.Sprintf("Failed to execute neuron %s", neuron.Name))
+				// Continue with next neuron even if one fails
+			}
+		}
+
+		h.logger.Infof("Synapse execution completed: %s", synapse.Name)
+	}()
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"id":      executionID,
+		"status":  "running",
+		"message": fmt.Sprintf("Started execution of synapse: %s", synapse.Name),
+	})
 }
 
 // Execute handles POST /api/execute

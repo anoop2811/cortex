@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Loader, AlertCircle, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader, AlertCircle, RefreshCw, Plus } from 'lucide-react';
 import { Neuron, ExecutionStatus } from '../types';
 import { apiClient } from '../api/client';
 import { NeuronCard } from './NeuronCard';
@@ -7,6 +8,7 @@ import { SystemMetrics } from './SystemMetrics';
 import { ExecutionLogs } from './ExecutionLogs';
 
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [neurons, setNeurons] = useState<Neuron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,9 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleStatusChange = (status: ExecutionStatus) => {
+    console.log('Dashboard handleStatusChange called with:', status);
     setSelectedExecution(status.id);
+    console.log('Set selectedExecution to:', status.id);
 
     // Update neuron status when execution completes
     if (status.status !== 'running') {
@@ -121,20 +125,32 @@ export const Dashboard: React.FC = () => {
 
         {/* Neuron Library */}
         <section className="mb-12 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-8 w-1 bg-gradient-cyan rounded-full"></div>
-            <h2
-              className="text-2xl font-heading font-bold text-text-primary"
-              aria-label="Neuron library"
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-1 bg-gradient-cyan rounded-full"></div>
+              <h2
+                className="text-2xl font-heading font-bold text-text-primary"
+                aria-label="Neuron library"
+              >
+                Neuron Library
+              </h2>
+            </div>
+            <button
+              onClick={() => navigate('/neurons/new')}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-purple hover:shadow-glow-purple text-white rounded-pill font-medium transition-all duration-300 hover:scale-105"
             >
-              Neuron Library
-            </h2>
+              <Plus className="w-4 h-4" />
+              Create Neuron
+            </button>
           </div>
           {neurons.length === 0 ? (
             <div className="glass rounded-2xl shadow-card p-16 text-center border border-primary-500/20">
               <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-purple opacity-20"></div>
               <p className="text-text-secondary text-xl mb-8">No neurons available</p>
-              <button className="bg-gradient-purple hover:shadow-glow-purple text-white px-8 py-4 rounded-pill font-medium text-lg transition-all duration-300 hover:scale-105">
+              <button
+                onClick={() => navigate('/neurons/new')}
+                className="bg-gradient-purple hover:shadow-glow-purple text-white px-8 py-4 rounded-pill font-medium text-lg transition-all duration-300 hover:scale-105"
+              >
                 Create Your First Neuron
               </button>
             </div>
@@ -154,15 +170,14 @@ export const Dashboard: React.FC = () => {
         </section>
 
         {/* Execution Logs */}
-        {selectedExecution && (
-          <section className="animate-fade-in">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-8 w-1 bg-accent-cyan rounded-full"></div>
-              <h2 className="text-2xl font-heading font-bold text-text-primary">Live Execution Logs</h2>
-            </div>
-            <ExecutionLogs executionId={selectedExecution} />
-          </section>
-        )}
+        <section className="animate-fade-in">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-8 w-1 bg-accent-cyan rounded-full"></div>
+            <h2 className="text-2xl font-heading font-bold text-text-primary">Live Execution Logs</h2>
+            {selectedExecution && <span className="text-sm text-text-muted">(Execution: {selectedExecution})</span>}
+          </div>
+          <ExecutionLogs />
+        </section>
       </main>
     </div>
   );

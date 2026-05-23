@@ -57,23 +57,33 @@ func (h *WebSocketHub) Run() {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
+			// Log client registration
+			println("WebSocket client registered. Total clients:", len(h.clients))
 
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.Send)
+				println("WebSocket client unregistered. Total clients:", len(h.clients))
 			}
 
 		case message := <-h.broadcast:
+			println("Broadcasting message to", len(h.clients), "clients")
 			data, err := json.Marshal(message)
 			if err != nil {
+				println("Error marshaling message:", err.Error())
 				continue
 			}
+
+			// Log the actual JSON being sent for debugging
+			println("WebSocket message JSON:", string(data))
 
 			for client := range h.clients {
 				select {
 				case client.Send <- data:
+					println("Message sent to client", client.ID)
 				default:
+					println("Failed to send to client", client.ID)
 					close(client.Send)
 					delete(h.clients, client)
 				}

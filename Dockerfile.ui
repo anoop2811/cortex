@@ -1,0 +1,70 @@
+# Multi-stage build for Cortex with Web UI
+# This Dockerfile builds both frontend and backend in Docker
+# No ARM64 issues, no platform-specific problems!
+
+# Stage 1: Build Frontend
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app/web/frontend
+
+# Copy frontend package files
+COPY web/frontend/package*.json ./
+
+# Install dependencies (including dev dependencies needed for build)
+RUN npm install
+
+# Copy frontend source
+COPY web/frontend/ ./
+
+# Build frontend
+RUN npm run build
+
+# Stage 2: Build Backend
+FROM golang:1.25-alpine AS backend-builder
+
+WORKDIR /build
+
+# Install build dependencies and CA certificates for go mod download
+# Workaround for certificate verification issues: temporarily use HTTP repositories
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
+    apk add --no-cache ca-certificates git make && \
+    update-ca-certificates && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Set SSL certificate path for Go to use system CA certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Copy built frontend from previous stage to match embed path
+COPY --from=frontend-builder /app/web/frontend/dist /build/web/server/frontend/dist
+
+# Build the binary (frontend is now embedded)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o cortex .
+
+# Stage 3: Runtime
+FROM alpine:latest
+
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates bash curl
+
+# Copy cortex binary from builder
+COPY --from=backend-builder /build/cortex /usr/local/bin/cortex
+
+# Copy examples
+COPY example /cortex/example
+
+WORKDIR /cortex
+
+# Expose default UI port
+EXPOSE 8080
+
+# Default command: show help
+CMD ["cortex", "--help"]
